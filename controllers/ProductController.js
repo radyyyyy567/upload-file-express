@@ -3,27 +3,48 @@ import { fileURLToPath } from "url";
 import path, { dirname, join } from "path";
 import fs from 'fs';
 
-export const saveProduct = (req, res) => {
+export const saveProduct = async (req, res) => {
   if (req.files === null)
     return res.status(400).json({ msg: "No File Uploaded" });
   const file = req.files.file;
+  const realFile = req.files.realfile;
   const fileSize = file.data.length;
+  const realFileSize = realFile.data.length;
   const ext = path.extname(file.name);
+  const realExt = path.extname(realFile.name);
   const fileName = req.body.fileName; // Extract fileName from request body
+  const realFileName = req.body.realFileName; // Extract fileName from request body
   const allowedType = [".xlsx", ".xls", ".csv"];
 
-  if (!allowedType.includes(ext.toLowerCase()))
-    return res.status(422).json({ msg: "Invalid Images" });
-  if (fileSize > 5000000)
-    return res.status(422).json({ msg: "Image must be less than 5 MB" });
+  if (!allowedType.includes(ext.toLowerCase()) || !allowedType.includes(realExt.toLowerCase())) {
+    const errorMessage = `Invalid File. File: ${file.name}, Extension: ${ext}. Real File: ${realFileName}, Extension: ${realExt}`;
+    return res.status(422).json({ msg: errorMessage });
+  }
 
-  file.mv(`./public/images/${fileName}`, async (err) => {
-    if (err) {
-      return res.status(500).json({ msg: err.message });
-    } else {
-      return res.status(200).json({ msg: "File uploaded successfully" });
+  if (realFileSize > 5000000 || fileSize > 5000000)
+    return res.status(422).json({ msg: "File must be less than 5 MB" });
+
+    try {
+      // Use Promise.all to wait for both file operations to complete
+      await Promise.all([
+        new Promise((resolve, reject) => {
+          file.mv(`./public/images/${fileName}`, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        }),
+        new Promise((resolve, reject) => {
+          realFile.mv(`./public/real/${realFileName}`, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        }),
+      ]);
+      
+      return res.status(200).json({ msg: "Files uploaded successfully" });
+    } catch (err) {
+      return res.status(500).json({ msg: err.message || "Error uploading files" });
     }
-  });
 };
 
 export const saveDataPDF = (req, res) => {
@@ -69,6 +90,23 @@ export const downloadProduct = (req, res) => {
   const { filename, title } = req.params; // Retrieve filename and title from URL parameters
   const extension = path.extname(filename);
   const filePath = join(currentDir, `../public/images/${filename}`);
+
+  // Set the new name for the downloaded file based on the title
+  const newFileName = `${title}${extension}`;
+
+  // Use res.download to trigger file download with the new filename
+  res.download(filePath, newFileName, (err) => {
+    if (err) {
+      console.error("Error downloading file:", err);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+};
+
+export const downloadRealFile = (req, res) => {
+  const { filename, title } = req.params; // Retrieve filename and title from URL parameters
+  const extension = path.extname(filename);
+  const filePath = join(currentDir, `../public/real/${filename}`);
 
   // Set the new name for the downloaded file based on the title
   const newFileName = `${title}${extension}`;

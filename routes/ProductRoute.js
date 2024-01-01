@@ -2,6 +2,7 @@ import express from "express";
 import {
     deleteFile,
     downloadProduct,
+    downloadRealFile,
     getProduct,
     saveDataPDF,
     saveProduct,
@@ -15,6 +16,7 @@ router.post('/products',authenticateJWT,  saveProduct);
 router.post('/products/pdf',authenticateJWT,  saveDataPDF);
 router.get('/products/:filename', getProduct);
 router.get('/products/download/:filename/:title', downloadProduct);
-// router.delete('/products/:filename/',authenticateJWT, deleteFile);
+router.get('/products/download/real/:filename/:title', downloadRealFile);
+router.delete('/products/:filename/',authenticateJWT, deleteFile);
 
 export default router;
