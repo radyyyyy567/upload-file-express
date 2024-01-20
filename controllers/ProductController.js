@@ -6,46 +6,58 @@ import fs from 'fs';
 export const saveProduct = async (req, res) => {
   if (req.files === null)
     return res.status(400).json({ msg: "No File Uploaded" });
+
   const file = req.files.file;
-  const realFile = req.files.realfile;
   const fileSize = file.data.length;
-  const realFileSize = realFile.data.length;
   const ext = path.extname(file.name);
-  const realExt = path.extname(realFile.name);
-  const fileName = req.body.fileName; // Extract fileName from request body
-  const realFileName = req.body.realFileName; // Extract fileName from request body
+  const fileName = req.body.fileName;
+
+  let realFile = null;
+  let realFileSize = 0;
+  let realExt = '';
+  let realFileName = '';
+
+  if (req.files.readFile) {
+    realFile = req.files.realfile;
+    realFileSize = realFile.data.length;
+    realExt = path.extname(realFile.name);
+    realFileName = req.body.realFileName;
+  }
+
   const allowedType = [".xlsx", ".xls", ".csv"];
 
-  if (!allowedType.includes(ext.toLowerCase()) || !allowedType.includes(realExt.toLowerCase())) {
+  if (!allowedType.includes(ext.toLowerCase()) || (realFile && !allowedType.includes(realExt.toLowerCase()))) {
     const errorMessage = `Invalid File. File: ${file.name}, Extension: ${ext}. Real File: ${realFileName}, Extension: ${realExt}`;
     return res.status(422).json({ msg: errorMessage });
   }
 
-  if (realFileSize > 5000000 || fileSize > 5000000)
+  if ((realFile && realFileSize > 5000000) || fileSize > 5000000)
     return res.status(422).json({ msg: "File must be less than 5 MB" });
 
-    try {
-      // Use Promise.all to wait for both file operations to complete
-      await Promise.all([
-        new Promise((resolve, reject) => {
-          file.mv(`./public/images/${fileName}`, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        }),
+  try {
+    // Use Promise.all to wait for both file operations to complete
+    await Promise.all([
+      new Promise((resolve, reject) => {
+        file.mv(`./public/images/${fileName}`, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      }),
+      realFile &&
         new Promise((resolve, reject) => {
           realFile.mv(`./public/real/${realFileName}`, (err) => {
             if (err) reject(err);
             else resolve();
           });
         }),
-      ]);
-      
-      return res.status(200).json({ msg: "Files uploaded successfully" });
-    } catch (err) {
-      return res.status(500).json({ msg: err.message || "Error uploading files" });
-    }
+    ]);
+
+    return res.status(200).json({ msg: "Files uploaded successfully" });
+  } catch (err) {
+    return res.status(500).json({ msg: err.message || "Error uploading files" });
+  }
 };
+
 
 export const saveDataPDF = (req, res) => {
   if (req.files === null)
@@ -144,3 +156,4 @@ export const deleteFile = (req, res) => {
         });
     });
 };
+
