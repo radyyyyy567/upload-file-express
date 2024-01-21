@@ -4,59 +4,64 @@ import path, { dirname, join } from "path";
 import fs from 'fs';
 
 export const saveProduct = async (req, res) => {
-  if (req.files === null)
-    return res.status(400).json({ msg: "No File Uploaded" });
-
-  const file = req.files.file;
-  const fileSize = file.data.length;
-  const ext = path.extname(file.name);
-  const fileName = req.body.fileName;
-
-  let realFile = null;
-  let realFileSize = 0;
-  let realExt = '';
-  let realFileName = '';
-
-  if (req.files.readFile) {
-    realFile = req.files.realfile;
-    realFileSize = realFile.data.length;
-    realExt = path.extname(realFile.name);
-    realFileName = req.body.realFileName;
-  }
-
-  const allowedType = [".xlsx", ".xls", ".csv"];
-
-  if (!allowedType.includes(ext.toLowerCase()) || (realFile && !allowedType.includes(realExt.toLowerCase()))) {
-    const errorMessage = `Invalid File. File: ${file.name}, Extension: ${ext}. Real File: ${realFileName}, Extension: ${realExt}`;
-    return res.status(422).json({ msg: errorMessage });
-  }
-
-  if ((realFile && realFileSize > 5000000) || fileSize > 5000000)
-    return res.status(422).json({ msg: "File must be less than 5 MB" });
-
   try {
+    if (!req.files || (req.files.length === 0 && !req.files.realfile)) {
+      return res.status(400).json({ msg: 'No File Uploaded' });
+    }
+    
+    const file = req.files.file;
+    const fileSize = file ? file.data.length : 0;
+    const ext = file ? path.extname(file.name) : '';
+    const fileName = req.body.fileName;
+    let realFile = req.files.realfile;
+    let realFileSize = realFile ? realFile.data.length : 0;
+    let realExt = realFile ? path.extname(realFile.name) : '';
+    let realFileName = req.body.realfileName;
+    console.log(req.body)
+    const allowedType = ['.xlsx', '.xls', '.csv'];
+
+    if ((file && !allowedType.includes(ext.toLowerCase())) || (realFile && !allowedType.includes(realExt.toLowerCase()))) {
+      const errorMessage = `Invalid File. File: ${file ? file.name : ''}, Extension: ${ext}. Real File: ${realFileName}, Extension: ${realExt}`;
+      return res.status(422).json({ msg: errorMessage });
+    }
+
+    if ((realFile && realFileSize > 5000000) || (file && fileSize > 5000000)) {
+      return res.status(422).json({ msg: 'File must be less than 5 MB' });
+    }
+
     // Use Promise.all to wait for both file operations to complete
     await Promise.all([
-      new Promise((resolve, reject) => {
-        file.mv(`./public/images/${fileName}`, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      }),
-      realFile &&
+      file &&
         new Promise((resolve, reject) => {
-          realFile.mv(`./public/real/${realFileName}`, (err) => {
+          file.mv(`./public/images/${fileName}`, (err) => {
             if (err) reject(err);
             else resolve();
           });
         }),
+      realFile &&
+        new Promise((resolve, reject) => {
+          const realFilePath = `./public/real/${realFileName}`;
+          console.log('Real File Path:', realFilePath);
+
+          realFile.mv(realFilePath, (err) => {
+            if (err) {
+              console.error('Error saving real file:', err);
+              reject(err);
+            } else {
+              console.log('Real File saved successfully');
+              resolve();
+            }
+          });
+        }),
     ]);
 
-    return res.status(200).json({ msg: "Files uploaded successfully" });
+    return res.status(200).json({ msg: 'Files uploaded successfully' });
   } catch (err) {
-    return res.status(500).json({ msg: err.message || "Error uploading files" });
+    return res.status(500).json({ msg: err.message || 'Error uploading files' });
   }
 };
+
+
 
 
 export const saveDataPDF = (req, res) => {
@@ -157,3 +162,26 @@ export const deleteFile = (req, res) => {
     });
 };
 
+export const deleteRealFile = (req, res) => {
+  const { realfilename } = req.params; // Retrieve filename from URL parameters
+  const filePath = join(currentDir, `../public/real/${realfilename}`); // Adjust the path based on your project structure
+
+  // Check if the file exists
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      // File doesn't exist, consider it deleted successfully
+      return res.status(200).json({ msg: 'File already deleted or not found' });
+    }
+
+    // File exists, proceed to delete it
+    fs.unlink(filePath, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error('Error deleting file:', unlinkErr);
+        return res.status(500).json({ error: 'Failed to delete file' });
+      }
+
+      // File deleted successfully
+      return res.status(200).json({ msg: 'File deleted successfully' });
+    });
+  });
+};
