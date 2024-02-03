@@ -16,7 +16,7 @@ export const saveProduct = async (req, res) => {
     let realFile = req.files.realfile;
     let realFileSize = realFile ? realFile.data.length : 0;
     let realExt = realFile ? path.extname(realFile.name) : '';
-    let realFileName = req.body.realfileName;
+    let realFileName = req.body.realFileName;
     console.log(req.body)
     const allowedType = ['.xlsx', '.xls', '.csv'];
 
@@ -40,7 +40,9 @@ export const saveProduct = async (req, res) => {
         }),
       realFile &&
         new Promise((resolve, reject) => {
+          console.log(realFileName)
           const realFilePath = `./public/real/${realFileName}`;
+          console.log(realFilePath)
           console.log('Real File Path:', realFilePath);
 
           realFile.mv(realFilePath, (err) => {
